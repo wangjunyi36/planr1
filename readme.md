@@ -143,7 +143,7 @@ bash simulation/run_simulation.sh <sim_type> <planner> <split> <ckpt_path>
 | `<planner>`  | `planr1_planner`, `planr1_planner_with_refinement`                                  |
 | `<split>`    | `val14`, `test14-random`, `test14-hard`                                             |
 
-### Example:
+### Example
 ```
 bash simulation/run_simulation.sh closed_loop_nonreactive_agents planr1_planner test14-random ckpts/fine-tuning.ckpt
 ```
