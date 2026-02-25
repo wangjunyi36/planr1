@@ -38,5 +38,5 @@ model:
   agent_radius: 60
   polygon_radius: 30
   pred_top_k: 1
-  val_visualization: False
+  val_visualization: True
   val_visualization_interval: 5

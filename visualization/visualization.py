@@ -6,7 +6,7 @@ from torch_geometric.data import Batch
 
 from utils import compute_corner_positions
 
-def visualization(data:Batch, pred_position:torch.tensor=None, pred_heading=None, iteration:int=None, num_historical_steps:int=20) -> None:
+def visualization(data:Batch, pred_position:torch.tensor=None, pred_heading=None, iteration:int=None, num_historical_steps:int=20, version:str=None) -> None:
     batch_size = len(data['agent']['ptr']) - 1
 
     agent_batch = data['agent']['batch']
@@ -131,10 +131,14 @@ def visualization(data:Batch, pred_position:torch.tensor=None, pred_heading=None
         ax.set_xlim(-80, 80)
         ax.set_ylim(-80, 80)
 
-        # save figure
-        os.makedirs('visualization/results', exist_ok=True)
-        if iteration is not None:
-            plt.savefig(f'visualization/results/{iteration}.png', bbox_inches='tight', pad_inches=0)
+        # save figure：按版本建子文件夹
+        if version is not None:
+            save_dir = os.path.join('visualization', 'results', version)
         else:
-            plt.savefig(f'visualization/results/{data["scenario_name"][i]}_{i}.png', bbox_inches='tight', pad_inches=0)
+            save_dir = 'visualization/results'
+        os.makedirs(save_dir, exist_ok=True)
+        if iteration is not None:
+            plt.savefig(os.path.join(save_dir, f'{iteration}.png'), bbox_inches='tight', pad_inches=0)
+        else:
+            plt.savefig(os.path.join(save_dir, f'{data["scenario_name"][i]}_{i}.png'), bbox_inches='tight', pad_inches=0)
         plt.close()

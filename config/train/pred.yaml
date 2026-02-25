@@ -29,7 +29,8 @@ trainer:
   strategy: ddp_find_unused_parameters_true
   accelerator: "gpu"
   devices: 1
-  max_epochs: 32 
+  max_epochs: 32
+  log_every_n_steps: 10 
   ckpt:
     monitor: val_token_cls_acc
     save_top_k: 3
@@ -58,5 +59,4 @@ model:
   warmup_epochs: 4
   T_max: 32
   val_visualization: True
-  # 每隔多少个 val batch 保存一次可视化（1=每个都保存，5=每 5 个保存 1 个）
-  val_visualization_interval: 5
+  val_visualization_interval: 10

@@ -11,7 +11,7 @@ datamodule:
   # root: 原始 nuPlan 数据根目录，需包含 nuplan-v1.1/splits/train
   root: /mnt/nuplan
   save_dir: /root/wangjunyi/data/planr1
-  dir: train
+  dir: mini
   train_batch_size: 4
   val_batch_size: 4
   shuffle: True
@@ -29,6 +29,8 @@ trainer:
   accelerator: "gpu"
   devices: 1
   max_epochs: 5
+  # 每多少个 step 打印一次训练日志，小于每 epoch 的 batch 数才能看到 step 日志
+  log_every_n_steps: 10
   ckpt:
     monitor: val_reward
     save_top_k: 5
@@ -61,7 +63,8 @@ model:
   weight_decay: 0.0001
   warmup_epochs: 0
   T_max: 32
-  val_visualization: False
+  val_visualization: True
+  val_visualization_interval: 10
   comfort_reward_weight: 2
   ttc_reward_weight: 5
   speed_limit_reward_weight: 2

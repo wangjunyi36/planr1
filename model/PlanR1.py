@@ -259,7 +259,9 @@ class PlanR1(pl.LightningModule):
         self.log('val_min_joint_fde', self.min_joint_fde, prog_bar=True, on_step=False, on_epoch=True)
 
         if self.val_visualization and batch_idx % self.val_visualization_interval == 0:
-            visualization(data, position, heading)
+            version_str = getattr(self.logger, 'version', None)
+            version_subdir = f'version_{version_str}' if version_str is not None else None
+            visualization(data, position, heading, version=version_subdir)
 
     def freeze_pred_model(self):
         # eval mode

@@ -40,5 +40,5 @@ model:
   pred_top_k: 1
   plan_top_k: 1
   rollout_top_k: 50
-  val_visualization: False
+  val_visualization: True
   val_visualization_interval: 5

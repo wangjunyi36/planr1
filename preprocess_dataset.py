@@ -1,3 +1,4 @@
+import argparse
 import os
 from typing import Callable, List, Optional, Tuple, Union
 import random
@@ -33,7 +34,8 @@ class NuplanDataset(Dataset):
                  num_samples_per_second: int = 10,
                  num_total_scenarios: int = 1000000,
                  ratio: float = 0.1,
-                 parallel: bool=True,
+                 parallel: bool = True,
+                 max_scenarios: Optional[int] = None,
                  save_dir: Optional[str] = None) -> None:
 
         self.root = root
@@ -76,11 +78,19 @@ class NuplanDataset(Dataset):
                 scenario_type = scenario.scenario_type
                 scenario_name = scenario.scenario_name
                 self._processed_file_names.append(f"{scenario_type}-{scenario_name}.pt")
+            n_total = len(self._processed_file_names)
+            if max_scenarios is not None:
+                n_use = min(max_scenarios, n_total)
+                rng = random.Random(42)
+                self._processed_file_names = rng.sample(self._processed_file_names, n_use)
+                print(f"Limit to min(max_scenarios={max_scenarios}, dataset={n_total}) = {n_use} scenarios (random sample, seed=42)", flush=True)
             random.seed(42)
             random.shuffle(self._processed_file_names)
             os.makedirs(self.save_dir, exist_ok=True)
-            torch.save(self._processed_file_names[:int(self.limit_total_scenarios*ratio)], os.path.join(self.save_dir, f"{self.dir}-processed_file_names-{self.mode}-val-PlanR1.pt"))
-            torch.save(self._processed_file_names[int(self.limit_total_scenarios*ratio):], os.path.join(self.save_dir, f"{self.dir}-processed_file_names-{self.mode}-train-PlanR1.pt"))
+            n = len(self._processed_file_names)
+            n_val = int(n * ratio)
+            torch.save(self._processed_file_names[:n_val], os.path.join(self.save_dir, f"{self.dir}-processed_file_names-{self.mode}-val-PlanR1.pt"))
+            torch.save(self._processed_file_names[n_val:], os.path.join(self.save_dir, f"{self.dir}-processed_file_names-{self.mode}-train-PlanR1.pt"))
             worker._executor.shutdown(wait=True)
 
         self._processed_paths = [os.path.join(self.processed_dir, name) for name in self.processed_file_names]
@@ -91,6 +101,7 @@ class NuplanDataset(Dataset):
         self.future_horizon = future_horizon
         self.num_future_steps = int(future_horizon * num_samples_per_second)
         self.parallel = parallel
+        self.max_scenarios = max_scenarios
 
         super(NuplanDataset, self).__init__(root=root, transform=transform)
 
@@ -129,12 +140,15 @@ class NuplanDataset(Dataset):
         os.makedirs(os.path.join(self.save_dir, f"{self.dir}-processed-{self.mode}-val-PlanR1"), exist_ok=True)
         self.train_file_names = torch.load(os.path.join(self.save_dir, f"{self.dir}-processed_file_names-{self.mode}-train-PlanR1.pt"))
         self.val_file_names = torch.load(os.path.join(self.save_dir, f"{self.dir}-processed_file_names-{self.mode}-val-PlanR1.pt"))
-                
+        need_names = set(self.train_file_names) | set(self.val_file_names)
+        scenarios = [s for s in scenarios if f"{s.scenario_type}-{s.scenario_name}.pt" in need_names]
+        print(f"Process: {len(scenarios)} scenarios in train+val list", flush=True)
+
         if self.parallel:
             batch_size = 50
             process_map(self.process_batch_scenario, 
                         [scenarios[i:i+batch_size] for i in range(0, len(scenarios), batch_size)],
-                        max_workers=100, 
+                        max_workers=10, 
                         chunksize=1)
         else:
             for scenario in tqdm(scenarios):
@@ -187,7 +201,19 @@ class NuplanDataset(Dataset):
         return HeteroData(torch.load(self.processed_paths[idx]))
 
 if __name__ == '__main__':
-    NuplanDataset(root='/mnt/nuplan', dir='train', split='train', mode='plan', num_total_scenarios=100000)
-    NuplanDataset(root='/mnt/nuplan', dir='train', split='val', mode='plan', num_total_scenarios=100000)
-    NuplanDataset(root='/mnt/nuplan', dir='train', split='train', mode='pred', num_total_scenarios=1000000)
-    NuplanDataset(root='/mnt/nuplan', dir='train', split='val', mode='pred', num_total_scenarios=1000000)
+    parser = argparse.ArgumentParser(description='Preprocess nuPlan to .pt for PlanR1.')
+    parser.add_argument('--dir', type=str, default='mini', choices=['train', 'mini'], help='splits 子目录')
+    parser.add_argument('--root', type=str, default='/mnt/nuplan', help='nuPlan 数据根目录')
+    parser.add_argument('--save_dir', type=str, default=None, help='输出目录')
+    parser.add_argument('--max_scenarios', type=int, default=None, help='限制处理的场景数量，与数据集数量取 min；不设则用全量')
+    parser.add_argument('--num_plan', type=int, default=100000, help='plan 的 limit_total_scenarios')
+    parser.add_argument('--num_pred', type=int, default=1000000, help='pred 的 limit_total_scenarios')
+    args = parser.parse_args()
+    save_dir = args.save_dir if args.save_dir else DEFAULT_SAVE_DIR
+    kw = dict(root=args.root, dir=args.dir, save_dir=save_dir, max_scenarios=args.max_scenarios)
+    print(f"Preprocess dir={args.dir}, save_dir={save_dir}, max_scenarios={args.max_scenarios}", flush=True)
+    NuplanDataset(**kw, split='train', mode='plan', num_total_scenarios=args.num_plan)
+    NuplanDataset(**kw, split='val', mode='plan', num_total_scenarios=args.num_plan)
+    NuplanDataset(**kw, split='train', mode='pred', num_total_scenarios=args.num_pred)
+    NuplanDataset(**kw, split='val', mode='pred', num_total_scenarios=args.num_pred)
+    print("Done.", flush=True)
