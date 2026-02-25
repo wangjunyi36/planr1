@@ -1,0 +1,7 @@
+ckpt/
+lightning_logs/
+visualization/results/
+
+# Python 字节码缓存（__pycache__ 目录及 .pyc 文件）
+__pycache__/
+*.pyc

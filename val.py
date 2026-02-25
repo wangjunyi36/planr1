@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 
 import pytorch_lightning as pl
+from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 
 from datasets import NuplanDataset
 from transforms import TokenBuilder
@@ -21,20 +22,32 @@ if __name__ == '__main__':
         model = PlanR1.load_from_checkpoint(config['trainer']['ckpt_path'], **config['model'])
     else:
         raise ValueError("No checkpoint path provided, please provide a valid checkpoint path.")
-        
+
+    loggers = []
+    if config['trainer'].get('csv_logger'):
+        csv_logger = CSVLogger(**config['trainer']['csv_logger'])
+        loggers.append(csv_logger)
+    if config['trainer'].get('tensorboard_logger'):
+        tb_cfg = dict(config['trainer']['tensorboard_logger'])
+        if loggers:
+            tb_cfg['version'] = loggers[0].version
+        loggers.append(TensorBoardLogger(**tb_cfg))
     trainer = pl.Trainer(
         devices=config['trainer']['devices'],
         accelerator=config['trainer']['accelerator'],
+        logger=loggers if loggers else True,
     )
-    dataset = NuplanDataset(config['dataset']['root'], 
-                            config['dataset']['dir'], 
-                            'val', 
+    dataset_kw = {'transform': TokenBuilder(config['dataset']['token_dict_path'],
+                                            config['dataset']['interval'],
+                                            config['dataset']['num_historical_steps'],
+                                            mode=config['dataset']['mode'])}
+    if config['dataset'].get('save_dir') is not None:
+        dataset_kw['save_dir'] = config['dataset']['save_dir']
+    dataset = NuplanDataset(config['dataset']['root'],
+                            config['dataset']['dir'],
+                            'val',
                             config['dataset']['mode'],
-                            transform=TokenBuilder(config['dataset']['token_dict_path'], 
-                                                   config['dataset']['interval'], 
-                                                   config['dataset']['num_historical_steps'], 
-                                                   mode="plan"
-                            )
+                            **dataset_kw
     )
     dataloader = DataLoader(dataset, 
                             batch_size=config['dataloader']['batch_size'], 

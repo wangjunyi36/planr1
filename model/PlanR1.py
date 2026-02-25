@@ -40,6 +40,7 @@ class PlanR1(pl.LightningModule):
                  warmup_epochs: int = 4,
                  T_max: int = 32,
                  val_visualization: bool = False,
+                 val_visualization_interval: int = 5,
                  comfort_reward_weight: float = 2,
                  ttc_reward_weight: float = 5,
                  speed_limit_reward_weight: float = 4,
@@ -74,6 +75,7 @@ class PlanR1(pl.LightningModule):
 
         # vis in validation
         self.val_visualization = val_visualization
+        self.val_visualization_interval = val_visualization_interval
 
         # reward weights
         self.comfort_reward_weight = comfort_reward_weight
@@ -256,7 +258,7 @@ class PlanR1(pl.LightningModule):
         self.log('val_min_joint_ade', self.min_joint_ade, prog_bar=True, on_step=False, on_epoch=True)
         self.log('val_min_joint_fde', self.min_joint_fde, prog_bar=True, on_step=False, on_epoch=True)
 
-        if self.val_visualization:
+        if self.val_visualization and batch_idx % self.val_visualization_interval == 0:
             visualization(data, position, heading)
 
     def freeze_pred_model(self):

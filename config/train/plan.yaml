@@ -8,7 +8,9 @@ univeral_config: &univeral_config
 
 datamodule:
   <<: *univeral_config
-  root: ../nuplan/dataset
+  # root: 原始 nuPlan 数据根目录，需包含 nuplan-v1.1/splits/train
+  root: /mnt/nuplan
+  save_dir: /root/wangjunyi/data/planr1
   dir: train
   train_batch_size: 4
   val_batch_size: 4
@@ -25,7 +27,7 @@ trainer:
   ckpt_path: ckpts/pre-training.ckpt
   strategy: ddp_find_unused_parameters_true
   accelerator: "gpu"
-  devices: 8
+  devices: 1
   max_epochs: 5
   ckpt:
     monitor: val_reward
@@ -34,6 +36,9 @@ trainer:
   lr_monitor:
     logging_interval: epoch
   csv_logger:
+    save_dir: lightning_logs
+    name: plan
+  tensorboard_logger:
     save_dir: lightning_logs
     name: plan
 

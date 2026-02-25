@@ -8,8 +8,11 @@ univeral_config: &univeral_config
 
 datamodule:
   <<: *univeral_config
-  root: ../nuplan/dataset
-  dir: train
+  # root: 原始 nuPlan 数据根目录，需包含 nuplan-v1.1/splits/train
+  root: /mnt/nuplan
+  # save_dir: 预处理后的 .pt 数据目录，需与 preprocess_dataset.py 保存路径一致
+  save_dir: /root/wangjunyi/data/planr1
+  dir: mini
   train_batch_size: 8
   val_batch_size: 16
   shuffle: True
@@ -25,7 +28,7 @@ trainer:
   ckpt_path: 
   strategy: ddp_find_unused_parameters_true
   accelerator: "gpu"
-  devices: 8
+  devices: 1
   max_epochs: 32 
   ckpt:
     monitor: val_token_cls_acc
@@ -34,6 +37,9 @@ trainer:
   lr_monitor:
     logging_interval: epoch
   csv_logger:
+    save_dir: lightning_logs
+    name: pred
+  tensorboard_logger:
     save_dir: lightning_logs
     name: pred
 
@@ -51,4 +57,6 @@ model:
   weight_decay: 0.0001
   warmup_epochs: 4
   T_max: 32
-  val_visualization: False
+  val_visualization: True
+  # 每隔多少个 val batch 保存一次可视化（1=每个都保存，5=每 5 个保存 1 个）
+  val_visualization_interval: 5

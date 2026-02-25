@@ -8,7 +8,8 @@ univeral_config: &univeral_config
 
 dataset:
   <<: *univeral_config
-  root: ../nuplan/dataset
+  root: /mnt/nuplan
+  save_dir: /root/wangjunyi/data/planr1
   dir: train
 
 dataloader:
@@ -20,7 +21,13 @@ dataloader:
 trainer:
   ckpt_path: ckpts/fine-tuning.ckpt
   accelerator: "gpu"
-  devices: 8
+  devices: 1
+  csv_logger:
+    save_dir: lightning_logs
+    name: val_plan
+  tensorboard_logger:
+    save_dir: lightning_logs
+    name: val_plan
 
 model:
   <<: *univeral_config
@@ -34,3 +41,4 @@ model:
   plan_top_k: 1
   rollout_top_k: 50
   val_visualization: False
+  val_visualization_interval: 5

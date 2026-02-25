@@ -16,7 +16,9 @@ from nuplan.planning.scenario_builder.nuplan_db.nuplan_scenario import NuPlanSce
 from datasets import get_scenario_map
 from datasets import get_filter_parameters
 from datasets import get_features
-from datasets import get_plan_scenario_types 
+from datasets import get_plan_scenario_types
+
+DEFAULT_SAVE_DIR = '/root/wangjunyi/data/planr1'
 
 
 class NuplanDataset(Dataset):
@@ -31,9 +33,11 @@ class NuplanDataset(Dataset):
                  num_samples_per_second: int = 10,
                  num_total_scenarios: int = 1000000,
                  ratio: float = 0.1,
-                 parallel: bool=True) -> None:
+                 parallel: bool=True,
+                 save_dir: Optional[str] = None) -> None:
 
         self.root = root
+        self.save_dir = save_dir if save_dir is not None else DEFAULT_SAVE_DIR
         if dir in ['train', 'val', 'test', 'mini']:
             self.dir = dir
         else:
@@ -47,12 +51,12 @@ class NuplanDataset(Dataset):
             raise ValueError(mode + ' is not valid')
         
         self.map_version = "nuplan-maps-v1.0"
-        self.map_path = os.path.join(self.root, 'maps')
+        self.map_path = os.path.join(self.root, 'nuplan-v1.1', 'maps')
         self.limit_total_scenarios = num_total_scenarios
         
         self._raw_file_names = os.listdir(os.path.join(self.root, 'nuplan-v1.1', 'splits', self.dir))
 
-        self.processed_file_names_path = os.path.join(self.root, 'nuplan-v1.1', 'splits', f"{self.dir}-processed_file_names-{self.mode}-{self.split}-PlanR1.pt")
+        self.processed_file_names_path = os.path.join(self.save_dir, f"{self.dir}-processed_file_names-{self.mode}-{self.split}-PlanR1.pt")
         if os.path.exists(self.processed_file_names_path):
             self._processed_file_names = torch.load(self.processed_file_names_path)
             print(f"Number of scenarios in {self.split} dataset: {len(self._processed_file_names)}")
@@ -74,8 +78,9 @@ class NuplanDataset(Dataset):
                 self._processed_file_names.append(f"{scenario_type}-{scenario_name}.pt")
             random.seed(42)
             random.shuffle(self._processed_file_names)
-            torch.save(self._processed_file_names[:int(self.limit_total_scenarios*ratio)], os.path.join(self.root, 'nuplan-v1.1', 'splits', f"{self.dir}-processed_file_names-{self.mode}-val-PlanR1.pt"))
-            torch.save(self._processed_file_names[int(self.limit_total_scenarios*ratio):], os.path.join(self.root, 'nuplan-v1.1', 'splits', f"{self.dir}-processed_file_names-{self.mode}-train-PlanR1.pt"))
+            os.makedirs(self.save_dir, exist_ok=True)
+            torch.save(self._processed_file_names[:int(self.limit_total_scenarios*ratio)], os.path.join(self.save_dir, f"{self.dir}-processed_file_names-{self.mode}-val-PlanR1.pt"))
+            torch.save(self._processed_file_names[int(self.limit_total_scenarios*ratio):], os.path.join(self.save_dir, f"{self.dir}-processed_file_names-{self.mode}-train-PlanR1.pt"))
             worker._executor.shutdown(wait=True)
 
         self._processed_paths = [os.path.join(self.processed_dir, name) for name in self.processed_file_names]
@@ -95,7 +100,7 @@ class NuplanDataset(Dataset):
 
     @property
     def processed_dir(self) -> str:
-        return os.path.join(self.root, 'nuplan-v1.1', 'splits', f"{self.dir}-processed-{self.mode}-{self.split}-PlanR1")
+        return os.path.join(self.save_dir, f"{self.dir}-processed-{self.mode}-{self.split}-PlanR1")
     
     @property
     def raw_file_names(self) -> Union[str, List[str], Tuple]:
@@ -120,10 +125,10 @@ class NuplanDataset(Dataset):
         builder = NuPlanScenarioBuilder(self.raw_paths, self.map_path, None, None, self.map_version, scenario_mapping=scenario_mapping)
         scenarios = builder.get_scenarios(scenario_filter, worker)
 
-        os.makedirs(os.path.join(self.root, 'nuplan-v1.1', 'splits', f"{self.dir}-processed-{self.mode}-train-PlanR1"), exist_ok=True)
-        os.makedirs(os.path.join(self.root, 'nuplan-v1.1', 'splits', f"{self.dir}-processed-{self.mode}-val-PlanR1"), exist_ok=True)
-        self.train_file_names = torch.load(os.path.join(self.root, 'nuplan-v1.1', 'splits', f"{self.dir}-processed_file_names-{self.mode}-train-PlanR1.pt"))
-        self.val_file_names = torch.load(os.path.join(self.root, 'nuplan-v1.1', 'splits', f"{self.dir}-processed_file_names-{self.mode}-val-PlanR1.pt"))
+        os.makedirs(os.path.join(self.save_dir, f"{self.dir}-processed-{self.mode}-train-PlanR1"), exist_ok=True)
+        os.makedirs(os.path.join(self.save_dir, f"{self.dir}-processed-{self.mode}-val-PlanR1"), exist_ok=True)
+        self.train_file_names = torch.load(os.path.join(self.save_dir, f"{self.dir}-processed_file_names-{self.mode}-train-PlanR1.pt"))
+        self.val_file_names = torch.load(os.path.join(self.save_dir, f"{self.dir}-processed_file_names-{self.mode}-val-PlanR1.pt"))
                 
         if self.parallel:
             batch_size = 50
@@ -169,9 +174,9 @@ class NuplanDataset(Dataset):
         data.update(get_features(ego_state_buffer, observation_buffer, map_api, traffic_lights, route_roadblock_ids, max_agents=20))
 
         if f"{scenario_type}-{scenario_name}.pt" in self.train_file_names:
-            torch.save(data, os.path.join(self.root, 'nuplan-v1.1', 'splits', f"{self.dir}-processed-{self.mode}-train-PlanR1", f"{scenario_type}-{scenario_name}.pt"))
+            torch.save(data, os.path.join(self.save_dir, f"{self.dir}-processed-{self.mode}-train-PlanR1", f"{scenario_type}-{scenario_name}.pt"))
         elif f"{scenario_type}-{scenario_name}.pt" in self.val_file_names:
-            torch.save(data, os.path.join(self.root, 'nuplan-v1.1', 'splits', f"{self.dir}-processed-{self.mode}-val-PlanR1", f"{scenario_type}-{scenario_name}.pt"))
+            torch.save(data, os.path.join(self.save_dir, f"{self.dir}-processed-{self.mode}-val-PlanR1", f"{scenario_type}-{scenario_name}.pt"))
         else:
             raise ValueError(f"{scenario_type}-{scenario_name}.pt is not in train or val")
         
@@ -182,7 +187,7 @@ class NuplanDataset(Dataset):
         return HeteroData(torch.load(self.processed_paths[idx]))
 
 if __name__ == '__main__':
-    NuplanDataset(root='../nuplan/dataset/', dir='train', split='train', mode='plan', num_total_scenarios=100000)
-    NuplanDataset(root='../nuplan/dataset/', dir='train', split='val', mode='plan', num_total_scenarios=100000)
-    NuplanDataset(root='../nuplan/dataset/', dir='train', split='train', mode='pred', num_total_scenarios=1000000)
-    NuplanDataset(root='../nuplan/dataset/', dir='train', split='val', mode='pred', num_total_scenarios=1000000)
+    NuplanDataset(root='/mnt/nuplan', dir='train', split='train', mode='plan', num_total_scenarios=100000)
+    NuplanDataset(root='/mnt/nuplan', dir='train', split='val', mode='plan', num_total_scenarios=100000)
+    NuplanDataset(root='/mnt/nuplan', dir='train', split='train', mode='pred', num_total_scenarios=1000000)
+    NuplanDataset(root='/mnt/nuplan', dir='train', split='val', mode='pred', num_total_scenarios=1000000)

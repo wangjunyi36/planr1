@@ -12,7 +12,7 @@ class NuplanDataModule(pl.LightningDataModule):
 
     def __init__(self,
                  root: str,
-                 dir:str,
+                 dir: str,
                  train_batch_size: int,
                  val_batch_size: int,
                  shuffle: bool = True,
@@ -29,10 +29,12 @@ class NuplanDataModule(pl.LightningDataModule):
                  num_total_scenarios: int = 1000000,
                  ratio: float = 0.1,
                  parallel: bool = True,
+                 save_dir: Optional[str] = None,
                  **kwargs) -> None:
         super(NuplanDataModule, self).__init__()
         self.root = root
         self.dir = dir
+        self.save_dir = save_dir
         self.train_batch_size = train_batch_size
         self.val_batch_size = val_batch_size
         self.shuffle = shuffle
@@ -51,13 +53,21 @@ class NuplanDataModule(pl.LightningDataModule):
         self.train_transform = TokenBuilder(token_dict_path, self.interval, num_historical_steps, self.mode)
         self.val_transform = TokenBuilder(token_dict_path, self.interval, num_historical_steps, self.mode)
 
+    def _dataset_kwargs(self):
+        kwargs = dict(num_total_scenarios=self.num_total_scenarios, ratio=self.ratio, parallel=self.parallel)
+        if self.save_dir is not None:
+            kwargs['save_dir'] = self.save_dir
+        return kwargs
+
     def prepare_data(self) -> None:
-        NuplanDataset(self.root, self.dir, 'train', self.mode, self.train_transform, num_total_scenarios=self.num_total_scenarios, ratio=self.ratio, parallel=self.parallel)
-        NuplanDataset(self.root, self.dir, 'val', self.mode, self.val_transform, num_total_scenarios=self.num_total_scenarios, ratio=self.ratio, parallel=self.parallel)
+        NuplanDataset(self.root, self.dir, 'train', self.mode, self.train_transform, **self._dataset_kwargs())
+        NuplanDataset(self.root, self.dir, 'val', self.mode, self.val_transform, **self._dataset_kwargs())
+        print("DataModule: prepare_data done.")
 
     def setup(self, stage: Optional[str] = None) -> None:
-        self.train_dataset = NuplanDataset(self.root, self.dir, 'train', self.mode, self.train_transform, num_total_scenarios=self.num_total_scenarios, ratio=self.ratio, parallel=self.parallel)
-        self.val_dataset = NuplanDataset(self.root, self.dir, 'val', self.mode, self.val_transform, num_total_scenarios=self.num_total_scenarios, ratio=self.ratio, parallel=self.parallel)
+        self.train_dataset = NuplanDataset(self.root, self.dir, 'train', self.mode, self.train_transform, **self._dataset_kwargs())
+        self.val_dataset = NuplanDataset(self.root, self.dir, 'val', self.mode, self.val_transform, **self._dataset_kwargs())
+        print("DataModule: setup done. Building DataLoader and loading first batch may take 30s-2min...")
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.train_batch_size, shuffle=self.shuffle,

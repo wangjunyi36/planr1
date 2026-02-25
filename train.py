@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
-from pytorch_lightning.loggers import CSVLogger
+from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 
 from datamodules import NuplanDataModule
 from model import PlanR1
@@ -34,13 +34,17 @@ if __name__ == '__main__':
     model_checkpoint = ModelCheckpoint(**config['trainer']['ckpt'])
     lr_monitor = LearningRateMonitor(**config['trainer']['lr_monitor'])
     csv_logger = CSVLogger(**config['trainer']['csv_logger'])
+    tb_cfg = dict(config['trainer'].get('tensorboard_logger', config['trainer']['csv_logger']))
+    tb_cfg['version'] = csv_logger.version
+    tensorboard_logger = TensorBoardLogger(**tb_cfg)
     trainer = pl.Trainer(
         strategy=config['trainer']['strategy'],
         devices=config['trainer']['devices'],
         accelerator=config['trainer']['accelerator'],
         callbacks=[model_checkpoint, lr_monitor],
         max_epochs=config['trainer']['max_epochs'],
-        logger=csv_logger
+        logger=[csv_logger, tensorboard_logger]
     )
 
+    print("Starting training (first step may take 30s-2min for data loading)...")
     trainer.fit(model, datamodule)
